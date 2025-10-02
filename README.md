@@ -3,3 +3,7 @@
 # Current Dataset:
 KuaiRand: An Unbiased Sequential Recommendation Dataset with Randomly Exposed Videos
   - https://github.com/chongminggao/KuaiRand
+
+
+pip install -r requirements.txt
+
