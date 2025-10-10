@@ -17,7 +17,7 @@ class ValueNet(nn.Module):
         # Output shape: (B,) where B = batch size
         return self.net(obs).squeeze(-1)
 
- 
+
 class QNet(nn.Module):
     """Q(s,a): predicts a scalar value for each (state, action) pair.
 

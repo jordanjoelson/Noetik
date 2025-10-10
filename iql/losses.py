@@ -16,7 +16,7 @@ def expectile_loss(diff: torch.Tensor, tau: float) -> torch.Tensor:
     return weight * (diff ** 2)
 
 
-def compute_iql_losses( 
+def compute_iql_losses(
     *,
     obs,
     act,
