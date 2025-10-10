@@ -16,7 +16,7 @@ class IQLConfig:
     temperature: float = 3.0           
 
     lr_policy: float = 3e-4
-    lr_q: float = 3e-4
+    lr_q: float = 3e-4 
     lr_v: float = 3e-4
 
     weight_decay: float = 0.0
