@@ -17,7 +17,7 @@ def fanin_init(m: nn.Module):
         nn.init.uniform_(m.weight, -bound, bound)
         if m.bias is not None:
             nn.init.uniform_(m.bias, -bound, bound)
-
+ 
 
 def build_mlp(in_dim: int, hidden: Iterable[int], out_dim: int, act=nn.ReLU) -> nn.Sequential:
     """Build a simple MLP: [Linear -> Activation] * N  then Linear -> out_dim.
