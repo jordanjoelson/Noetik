@@ -12,7 +12,7 @@ def main():
     print(f"act shape: {dataset.act.shape}")
     print(f"rew shape: {dataset.rew.shape}")
     print(f"next_obs shape: {dataset.next_obs.shape}")
-    print(f"done shape: {dataset.done.shape}")
+    print(f"done shape: {dataset.done.shape}") 
 
     # Configure and build the agent
     obs_dim = dataset.obs.shape[1]

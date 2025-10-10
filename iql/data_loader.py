@@ -13,7 +13,7 @@ class KuaiRandDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
-
+ 
     def __getitem__(self, idx):
         obs = torch.tensor(self.data.loc[idx, self.obs_cols].values, dtype=torch.float32)
         act = torch.tensor(self.data.loc[idx, self.act_cols].values, dtype=torch.float32)
