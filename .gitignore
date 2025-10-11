@@ -1,3 +1,37 @@
+# Dataset
 KuaiRand-1k/
+KuaiRand-1K/
+
+# Virtual environment
 kuairand_env/
-kuairand_env/
+
+# Processed data cache
+processed_data/
+
+# Outputs
+outputs/
+
+# Claude Code
+.claude/
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# macOS
+.DS_Store
