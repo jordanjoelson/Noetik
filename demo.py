@@ -15,7 +15,14 @@ print("="*60)
 # Load data
 print("\n[1/3] Loading dataset...")
 loader = KuaiRandDataLoader()
-loader.load_processed_data()
+
+try:
+    loader.load_processed_data()
+except FileNotFoundError:
+    print("Processing dataset for first time (this may take 30-60 seconds)...")
+    loader.load_data(random_only=True)
+    loader.save_processed_data()
+
 print(f"Dataset: {loader.get_n_users():,} users, {loader.get_n_videos():,} videos")
 
 # Create environment
