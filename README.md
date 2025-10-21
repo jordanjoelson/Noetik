@@ -9,6 +9,8 @@ source kuairand_env/bin/activate
 python demo.py
 ```
 
+**Note:** First run will process the dataset (~30-60 seconds). Subsequent runs load from cache (~2 seconds).
+
 ## Project Structure
 
 ```
