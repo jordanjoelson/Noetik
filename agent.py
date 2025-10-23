@@ -3,10 +3,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from .config import IQLConfig
-from .networks import GaussianTanhPolicy, ValueNet, QNet
-from .losses import compute_iql_losses
-from .batch import Batch
+from src.iql.config import IQLConfig
+from src.iql.networks import GaussianTanhPolicy, ValueNet, QNet
+from src.iql.losses import compute_iql_losses
+from src.iql.batch import Batch
  
 
 
@@ -14,14 +14,12 @@ class IQLAgent(nn.Module):
     def __init__(self, cfg: IQLConfig):
         super().__init__()
         self.cfg = cfg
-        # Build networks from the config
         self.policy = GaussianTanhPolicy(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes,
                                          cfg.policy_log_std_min, cfg.policy_log_std_max)
         self.value = ValueNet(cfg.obs_dim, cfg.hidden_sizes)
         self.q1 = QNet(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes)
         self.q2 = QNet(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes)
 
-        # One optimizer per objective family (lets you tune learning rates separately)
         self.opt_policy = optim.Adam(self.policy.parameters(), lr=cfg.lr_policy, weight_decay=cfg.weight_decay)
         self.opt_q = optim.Adam(list(self.q1.parameters()) + list(self.q2.parameters()), lr=cfg.lr_q, weight_decay=cfg.weight_decay)
         self.opt_v = optim.Adam(self.value.parameters(), lr=cfg.lr_v, weight_decay=cfg.weight_decay)
