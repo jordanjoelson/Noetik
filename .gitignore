@@ -1,2 +1,6 @@
 KuaiRand-1K/data
 src/iql/__pycache__
+__pycache__
+src/training/__pycache__
+venv/
+iql/__pycache__
