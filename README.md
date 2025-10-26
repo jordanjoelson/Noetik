@@ -8,7 +8,7 @@
 - Agent
   - Policy
     - Attention Mechanism
-- Interpretability Layer
+  - Interpretability Layer
 - Trainer
   - Action chosen in the policy
   
