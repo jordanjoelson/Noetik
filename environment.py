@@ -7,7 +7,7 @@ class KuaiRandEnv(gym.Env):
     """
     Gymnasium-compatible RL environment for video recommendation
 
-    State: 64-dimensional vector (user embedding + history + context)
+    State: 128-dimensional vector (user + content + temporal + context + history)
     Action: Discrete (video index to recommend)
     Reward: Composite signal (click + watch_ratio + like)
     Episode: 10 steps
@@ -21,7 +21,7 @@ class KuaiRandEnv(gym.Env):
 
         self.action_space = gym.spaces.Discrete(data_loader.get_n_videos())
         self.observation_space = gym.spaces.Box(
-            low=-10.0, high=10.0, shape=(64,), dtype=np.float32
+            low=-10.0, high=10.0, shape=(128,), dtype=np.float32
         )
 
         self.current_user_idx = None
@@ -33,7 +33,7 @@ class KuaiRandEnv(gym.Env):
         Reset environment and start new episode
 
         Returns:
-            state: 64-dimensional state vector
+            state: 128-dimensional state vector
             info: Additional information
         """
         super().reset(seed=seed)
@@ -91,88 +91,195 @@ class KuaiRandEnv(gym.Env):
 
     def _get_state(self) -> np.ndarray:
         """
-        Encode current state as 64-dimensional vector
+        Encode current state as 128-dimensional vector
 
         State components:
-        - [0:16]: User embedding
-        - [16:48]: History embedding
-        - [48:64]: Context features
+        - [0:32]: User embedding
+        - [32:64]: Content preferences
+        - [64:96]: Temporal patterns
+        - [96:112]: Context features
+        - [112:128]: History embedding
         """
-        state = np.zeros(64, dtype=np.float32)
+        state = np.zeros(128, dtype=np.float32)
 
-        user_emb = self._encode_user(self.current_user_idx)
-        state[0:16] = user_emb
+        # 1. User embedding (0-31)
+        user_emb = self._encode_user_embedding(self.current_user_idx)
+        state[0:32] = user_emb
 
-        history_emb = self._encode_history(self.current_user_idx)
-        state[16:48] = history_emb
+        # 2. Content preferences (32-63)
+        content_emb = self._encode_content_preferences()
+        state[32:64] = content_emb
 
-        context_emb = self._encode_context()
-        state[48:64] = context_emb
+        # 3. Temporal patterns (64-95)
+        temporal_emb = self._encode_temporal_patterns()
+        state[64:96] = temporal_emb
+
+        # 4. Context features (96-111)
+        context_emb = self._encode_context_features()
+        state[96:112] = context_emb
+
+        # 5. History embedding (112-127)
+        history_emb = self._encode_history_embedding()
+        state[112:128] = history_emb
 
         return state
 
-    def _encode_user(self, user_idx: int) -> np.ndarray:
-        """
-        Encode user as 16-dimensional vector
-
-        Uses user statistics from data loader
-        """
-        user_emb = np.zeros(16, dtype=np.float32)
-
-        user_emb[user_idx % 16] = 1.0
-
+    def _encode_user_embedding(self, user_idx: int) -> np.ndarray:
+        """32-dim: User characteristics, preferences, and behavior patterns"""
+        user_emb = np.zeros(32, dtype=np.float32)
         user_stats = self.data_loader.user_stats.get(user_idx, {})
+        user_history = self.data_loader.get_user_history(user_idx)
+        
+        # Basic engagement metrics (0-7)
         user_emb[0] = user_stats.get('click_rate', 0.0)
         user_emb[1] = user_stats.get('like_rate', 0.0)
         user_emb[2] = user_stats.get('avg_watch_ratio', 0.0)
-        user_emb[3] = min(1.0, user_stats.get('count', 0) / 1000.0)  # Normalized count
-
-        return user_emb
-
-    def _encode_history(self, user_idx: int) -> np.ndarray:
-        """
-        Encode user history as 32-dimensional vector
-
-        Includes both long-term history and episode history
-        """
-        history_emb = np.zeros(32, dtype=np.float32)
-
-        user_history = self.data_loader.get_user_history(user_idx)
-
-        if len(user_history['video_sequence']) > 0:
-            recent_videos = user_history['video_sequence'][-10:]
+        user_emb[3] = min(1.0, user_stats.get('count', 0) / 200.0)
+        
+        # Engagement depth (8-15) - FIXED: Check if arrays exist and have data
+        if user_history and user_history.get('watch_ratios') and len(user_history['watch_ratios']) > 0:
+            recent_watches = user_history['watch_ratios'][-20:]
+            user_emb[8] = np.mean(recent_watches)
+            user_emb[9] = np.mean([1 for r in recent_watches if r > 0.8]) if recent_watches else 0.0
+            user_emb[10] = max(recent_watches) if recent_watches else 0.0
+            user_emb[11] = np.std(recent_watches) if len(recent_watches) > 1 else 0.0
+        
+        # Consistency patterns (16-23) - FIXED: Check if arrays exist and have data
+        if user_history and user_history.get('clicks') and len(user_history['clicks']) > 10:
             recent_clicks = user_history['clicks'][-10:]
-            recent_watch_ratios = user_history['watch_ratios'][-10:]
-            recent_likes = user_history['likes'][-10:]
+            user_emb[16] = np.mean(recent_clicks)
+            user_emb[17] = np.std(recent_clicks) if len(recent_clicks) > 1 else 0.0
+            user_emb[18] = 1 if recent_clicks[-1] == 1 else 0
+        
+        # Like behavior (24-31) - FIXED: Check if arrays exist and have data
+        if user_history and user_history.get('likes') and len(user_history['likes']) > 0:
+            recent_likes = user_history['likes'][-20:]
+            user_emb[24] = np.mean(recent_likes) if recent_likes else 0.0
+            user_emb[25] = sum(user_history['likes']) / len(user_history['likes'])
+        
+        return user_emb
+    def _encode_content_preferences(self) -> np.ndarray:
+        """32-dim: What types of content the user engages with"""
+        content_emb = np.zeros(32, dtype=np.float32)
+        user_history = self.data_loader.get_user_history(self.current_user_idx)
+        
+        # FIXED: Comprehensive check for empty history
+        if not user_history or not user_history.get('video_sequence') or len(user_history['video_sequence']) == 0:
+            return content_emb
+        
+        recent_videos = user_history['video_sequence'][-30:]
+        recent_clicks = user_history['clicks'][-30:] if user_history.get('clicks') else []
+        recent_watches = user_history['watch_ratios'][-30:] if user_history.get('watch_ratios') else []
+        
+        # Content diversity (0-7)
+        unique_videos = len(set(recent_videos))
+        content_emb[0] = unique_videos / len(recent_videos)
+        content_emb[1] = len(set(recent_videos)) / 100.0
+        
+        # Video popularity patterns (8-15)
+        if recent_clicks and len(recent_clicks) > 0:
+            successful_videos = [v for v, c in zip(recent_videos, recent_clicks) if c == 1]
+            if successful_videos:
+                video_popularities = [self.data_loader.video_stats.get(v, {}).get('count', 0) 
+                                    for v in successful_videos]
+                if video_popularities and len(video_popularities) > 0:
+                    content_emb[8] = min(1.0, np.mean(video_popularities) / 500.0)
+                    content_emb[9] = min(1.0, max(video_popularities) / 500.0)
+                    content_emb[10] = np.std(video_popularities) / 100.0 if len(video_popularities) > 1 else 0.0
+        
+        # Engagement quality (16-23)
+        if recent_watches and len(recent_watches) > 0:
+            content_emb[16] = np.mean(recent_watches)
+            content_emb[17] = np.mean([1 for w in recent_watches if w > 0.8]) if recent_watches else 0.0
+            content_emb[18] = np.std(recent_watches) if len(recent_watches) > 1 else 0.0
+        
+        # Click patterns (24-31)
+        if recent_clicks and len(recent_clicks) > 0:
+            content_emb[24] = np.mean(recent_clicks)
+            content_emb[25] = sum(recent_clicks) / 30.0
+        
+        return content_emb
 
-            history_emb[0] = len(recent_videos) / 50.0  # Normalized count
-            history_emb[1] = np.mean(recent_clicks) if recent_clicks else 0.0
-            history_emb[2] = np.mean(recent_watch_ratios) if recent_watch_ratios else 0.0
-            history_emb[3] = np.std(recent_watch_ratios) if len(recent_watch_ratios) > 1 else 0.0
-            history_emb[4] = np.mean(recent_likes) if recent_likes else 0.0
+    def _encode_temporal_patterns(self) -> np.ndarray:
+        """32-dim: Recent behavior trends and temporal dynamics"""
+        temporal_emb = np.zeros(32, dtype=np.float32)
+        
+        if len(self.episode_history) > 0:
+            recent_rewards = [h['reward'] for h in self.episode_history[-8:]]
+            recent_clicks = [h['interaction']['is_click'] for h in self.episode_history[-8:]]
+            recent_watches = [h['interaction']['watch_ratio'] for h in self.episode_history[-8:]]
+            
+            # Current session performance (0-7)
+            temporal_emb[0] = np.mean(recent_rewards) if recent_rewards else 0.0    
+            temporal_emb[1] = sum(recent_clicks) / len(recent_clicks) if recent_clicks else 0.0  
+            temporal_emb[2] = np.mean(recent_watches) if recent_watches else 0.0    
+            
+            # Engagement trends (8-15)
+            if len(recent_rewards) >= 3:
+                temporal_emb[8] = np.mean(recent_rewards[-3:]) - np.mean(recent_rewards[:-3])  
+                temporal_emb[9] = 1 if recent_rewards[-1] > recent_rewards[0] else -1        
+            
+            # Patterns and streaks (16-23)
+            if len(recent_clicks) >= 4:
+                temporal_emb[16] = sum(recent_clicks[-2:])                          
+                temporal_emb[17] = 1 if all(recent_clicks[-2:]) else 0             
+                temporal_emb[18] = 1 if not any(recent_clicks[-2:]) else 0          
+            
+            # Watch pattern analysis (24-31)
+            if recent_watches:
+                temporal_emb[24] = sum(1 for w in recent_watches if w > 0.7) / len(recent_watches)  
+                temporal_emb[25] = max(recent_watches)                              
+        
+        # Session timing (28-31)
+        temporal_emb[28] = self.current_step / self.max_episode_length  
+        temporal_emb[29] = (self.max_episode_length - self.current_step) / self.max_episode_length  
+        
+        return temporal_emb
 
-            if len(recent_videos) > 0:
-                history_emb[5] = len(set(recent_videos)) / len(recent_videos)
-
+    def _encode_context_features(self) -> np.ndarray:
+        """16-dim: Current session context and environment"""
+        context_emb = np.zeros(16, dtype=np.float32)
+        
+        # Session progress and timing (0-7)
+        context_emb[0] = self.current_step / self.max_episode_length                 
+        context_emb[1] = (self.max_episode_length - self.current_step) / self.max_episode_length  
+        context_emb[2] = 1.0 if self.current_step == 0 else 0.0                     
+        context_emb[3] = 1.0 if self.current_step >= self.max_episode_length - 1 else 0.0  
+        
+        # Current session performance (8-15)
         if len(self.episode_history) > 0:
             episode_rewards = [h['reward'] for h in self.episode_history]
-            history_emb[6] = np.mean(episode_rewards)
-            history_emb[7] = np.max(episode_rewards)
-            history_emb[8] = len(self.episode_history) / self.max_episode_length
-
-        return history_emb
-
-    def _encode_context(self) -> np.ndarray:
-        """
-        Encode episode context as 16-dimensional vector
-        """
-        context_emb = np.zeros(16, dtype=np.float32)
-
-        context_emb[0] = self.current_step / self.max_episode_length
-
-        context_emb[1] = (self.max_episode_length - self.current_step) / self.max_episode_length
-
+            episode_clicks = [h['interaction']['is_click'] for h in self.episode_history]
+            
+            context_emb[8] = np.mean(episode_rewards)                               
+            context_emb[9] = sum(episode_clicks) / len(episode_clicks)              
+            context_emb[10] = len(self.episode_history) / self.max_episode_length  
+            context_emb[11] = sum(episode_clicks)                                  
+        
         return context_emb
+
+    def _encode_history_embedding(self) -> np.ndarray:
+        """16-dim: Recent interaction history and patterns"""
+        history_emb = np.zeros(16, dtype=np.float32)
+        
+        if len(self.episode_history) > 0:
+            # Recent interactions (0-7)
+            last_interaction = self.episode_history[-1]
+            history_emb[0] = last_interaction['reward']                             
+            history_emb[1] = last_interaction['interaction']['is_click']            
+            history_emb[2] = last_interaction['interaction']['watch_ratio']         
+            history_emb[3] = last_interaction['interaction']['is_like']             
+            
+            # Recent patterns (8-15)
+            recent_rewards = [h['reward'] for h in self.episode_history[-3:]]       
+            recent_clicks = [h['interaction']['is_click'] for h in self.episode_history[-3:]]
+            
+            if recent_rewards:
+                history_emb[8] = np.mean(recent_rewards)                            
+                history_emb[9] = sum(recent_clicks) / len(recent_clicks)            
+                history_emb[10] = 1 if recent_clicks[-1] == 1 else 0                
+        
+        return history_emb
 
     def _simulate_user_interaction(self, user_idx: int, video_idx: int) -> Tuple[float, Dict]:
         """
@@ -227,18 +334,24 @@ class KuaiRandEnv(gym.Env):
         return reward, interaction_data
 
     def _calculate_reward(self, is_click: int, watch_ratio: float, is_like: int) -> float:
-        """
-        Calculate composite reward from interaction signals
-
-        Reward = 0.3 * click + 0.4 * watch_ratio + 0.3 * like
-        Range: [0, 1.0]
-        """
-        reward = (
-            0.3 * is_click +
-            0.4 * watch_ratio +
-            0.3 * is_like
-        )
-        return float(reward)
+        # Conservative weights that sum to <= 1.0 even with bonuses
+        click_reward = 0.25 * is_click
+        watch_reward = 0.35 * watch_ratio  
+        like_reward = 0.25 * is_like
+        
+        quality_bonus = 0.0
+        if is_click:
+            if watch_ratio > 0.8:
+                quality_bonus += 0.1
+            elif watch_ratio > 0.5:
+                quality_bonus += 0.05
+            
+            if is_like:
+                quality_bonus += 0.05
+        
+        total_reward = click_reward + watch_reward + like_reward + quality_bonus
+        
+        return min(max(total_reward, 0.0), 1.0)
 
 
 if __name__ == "__main__":
@@ -259,7 +372,7 @@ if __name__ == "__main__":
 
     # Test 1: Reset
     state, info = env.reset()
-    assert state.shape == (64,), f"State shape should be (64,), got {state.shape}"
+    assert state.shape == (128,), f"State shape should be (128,), got {state.shape}"
     print(f"Reset works, state shape: {state.shape}")
 
     # Test 2: Action space
@@ -269,7 +382,7 @@ if __name__ == "__main__":
     # Test 3: Step
     action = env.action_space.sample()
     next_state, reward, terminated, truncated, info = env.step(action)
-    assert next_state.shape == (64,), "Next state shape incorrect"
+    assert next_state.shape == (128,), "Next state shape incorrect"
     assert 0 <= reward <= 1.0, f"Reward should be in [0, 1], got {reward}"
     print(f"Step works, reward: {reward:.3f}")
 

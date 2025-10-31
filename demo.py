@@ -31,7 +31,7 @@ print(f"Action space: {env.action_space.n:,} videos")
 
 print("\n[3/3] Creating IQL agent...")
 agent_config = IQLConfig(
-    obs_dim=64,
+    obs_dim=128,
     act_dim=1, 
     hidden_sizes=(256, 256)
 )
