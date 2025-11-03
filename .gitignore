@@ -11,6 +11,10 @@ processed_data/
 # Outputs
 outputs/
 
+# Model checkpoints
+checkpoints/
+checkpoints_improved/
+
 # Claude Code
 .claude/
 

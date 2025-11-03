@@ -227,10 +227,12 @@ class KuaiRandEnv(gym.Env):
             # Sample click
             is_click = 1 if np.random.random() < estimated_click_prob else 0
 
-            # If clicked, estimate watch ratio and like
+            # Estimate watch ratio (can happen even without click)
+            video_watch = video_stats.get('avg_watch_ratio', 0.3)
+            user_watch = user_stats.get('avg_watch_ratio', 0.3)
+
             if is_click:
-                video_watch = video_stats.get('avg_watch_ratio', 0.3)
-                user_watch = user_stats.get('avg_watch_ratio', 0.3)
+                # Higher watch ratio when clicked (from dataset: 44.4% avg)
                 estimated_watch = 0.6 * video_watch + 0.4 * user_watch
                 watch_ratio = min(1.0, max(0.0, estimated_watch + np.random.normal(0, 0.1)))
 
@@ -239,7 +241,10 @@ class KuaiRandEnv(gym.Env):
                 estimated_like_prob = 0.6 * video_like_rate + 0.4 * user_like_rate
                 is_like = 1 if np.random.random() < estimated_like_prob else 0
             else:
-                watch_ratio = 0.0
+                # Lower watch ratio when not clicked (from dataset: 9% avg)
+                # Scale down the watch ratio for non-clicks
+                estimated_watch = 0.2 * (0.6 * video_watch + 0.4 * user_watch)
+                watch_ratio = min(1.0, max(0.0, estimated_watch + np.random.normal(0, 0.05)))
                 is_like = 0
 
         # Calculate composite reward
@@ -255,17 +260,8 @@ class KuaiRandEnv(gym.Env):
         return reward, interaction_data
 
     def _calculate_reward(self, is_click: int, watch_ratio: float, is_like: int) -> float:
-        """
-        Calculate composite reward from interaction signals
-
-        Reward = 0.3 * click + 0.4 * watch_ratio + 0.3 * like
-        Range: [0, 1.0]
-        """
-        reward = (
-            0.3 * is_click +
-            0.4 * watch_ratio +
-            0.3 * is_like
-        )
+        """Calculate reward: 0.5 * click + 0.5 * watch_ratio"""
+        reward = 0.5 * is_click + 0.5 * watch_ratio
         return float(reward)
 
 
