@@ -3,15 +3,12 @@ import torch.nn as nn
 from typing import Iterable
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 from .batch import Batch
 
 
 def fanin_init(m: nn.Module):
-    """Initialize Linear layers uniformly in ±1/sqrt(fan_in).
-
-    Why? If initial weights are too big/small, activations and gradients can explode
-    or vanish. This simple scheme keeps things in a reasonable range at the start.
-    """
+    """Initialize Linear layers uniformly in ±1/sqrt(fan_in)."""
     if isinstance(m, nn.Linear):
         bound = 1.0 / (m.weight.size(1) ** 0.5)
         nn.init.uniform_(m.weight, -bound, bound)
@@ -20,14 +17,7 @@ def fanin_init(m: nn.Module):
  
 
 def build_mlp(in_dim: int, hidden: Iterable[int], out_dim: int, act=nn.ReLU) -> nn.Sequential:
-    """Build a simple MLP: [Linear -> Activation] * N  then Linear -> out_dim.
-
-    Args:
-      in_dim: input feature size
-      hidden: iterable of hidden layer sizes (e.g., (256, 256))
-      out_dim: final output size
-      act: activation class (default nn.ReLU). Try nn.SiLU for a smooth alternative.
-    """
+    """Build MLP: [Linear -> Activation] * N then Linear -> out_dim."""
     layers = []
     prev = in_dim
     for h in hidden:
@@ -38,44 +28,96 @@ def build_mlp(in_dim: int, hidden: Iterable[int], out_dim: int, act=nn.ReLU) -> 
     net.apply(fanin_init)
     return net
 
-def preprocess_kuairand(csv_path: str, obs_cols=None, act_cols=None, reward_col="long_view"):
+def preprocess_kuairand(data_loader, env, max_transitions_per_user: int = None):
     """
-    Preprocess the KuaiRand 1k dataset for IQL training.
+    Convert KuaiRand logged data into offline RL transitions.
 
     Args:
-        csv_path: path to kuairand CSV file
-        obs_cols: list of columns to use as observations (state)
-        act_cols: list of columns to use as actions
-        reward_col: column to use as reward
+        data_loader: KuaiRandDataLoader instance
+        env: KuaiRandEnv instance
+        max_transitions_per_user: Maximum transitions per user (None = all)
 
     Returns:
-        Batch object containing obs, act, rew, next_obs, done
+        Batch object with (obs, act, rew, next_obs, done)
     """
-    import pandas as pd
-    import torch
-    from iql.batch import Batch
+    from .batch import Batch
 
-    df = pd.read_csv(csv_path, sep=",")
+    all_obs = []
+    all_acts = []
+    all_rews = []
+    all_next_obs = []
+    all_dones = []
 
-    if "is_rand" in df.columns:
-        df = df[df["is_rand"] == 0].reset_index(drop=True)
+    n_users = data_loader.get_n_users()
+    n_videos = data_loader.get_n_videos()
 
-    df = df.sort_values(["user_id", "time_ms"]).reset_index(drop=True)
+    print(f"Preprocessing {n_users} users into offline dataset...")
 
-    if obs_cols is None:
-        obs_cols = ["is_click", "is_like", "is_follow", "is_comment", "is_forward", "play_time_ms"]
-    if act_cols is None:
-        act_cols = ["is_click", "is_like", "is_follow"]
-    if reward_col not in df.columns:
-        raise ValueError(f"Reward column {reward_col} not found in dataset")
+    for user_idx in tqdm(range(n_users), desc="Processing users"):
+        # Get user's interaction history
+        history = data_loader.get_user_history(user_idx)
+        video_seq = history['video_sequence']
 
-    obs = torch.tensor(df[obs_cols].values, dtype=torch.float32)
-    act = torch.tensor(df[act_cols].values, dtype=torch.float32)
-    rew = torch.tensor(df[reward_col].values, dtype=torch.float32)
+        if len(video_seq) < 2:
+            continue  # Need at least 2 interactions for (s, a, r, s')
 
-    next_obs = torch.tensor(df.groupby("user_id")[obs_cols].shift(-1).fillna(0).values, dtype=torch.float32)
-    done = torch.tensor(df.groupby("user_id")[obs_cols[0]].shift(-1).isna().fillna(1).values, dtype=torch.float32)
+        # Limit transitions per user if specified
+        max_len = len(video_seq) - 1
+        if max_transitions_per_user is not None:
+            max_len = min(max_len, max_transitions_per_user)
 
-    batch = Batch(obs=obs, act=act, rew=rew, next_obs=next_obs, done=done)
+        # Set environment to this user and extract transitions
+        env.current_user_idx = user_idx
 
-    return batch
+        for step in range(max_len):
+            # Current state
+            env.current_step = step
+            env.episode_history = []
+            for i in range(step):
+                env.episode_history.append({
+                    'video_idx': video_seq[i],
+                    'reward': history['clicks'][i] * 0.5 + history['watch_ratios'][i] * 0.5
+                })
+            state = env._get_state()
+
+            # Action taken (video recommended)
+            action_discrete = video_seq[step]
+            # Convert to continuous action [-1, 1] for IQL policy
+            action_continuous = (action_discrete / (n_videos - 1)) * 2.0 - 1.0
+
+            # Reward: 50/50 click + watch
+            reward = history['clicks'][step] * 0.5 + history['watch_ratios'][step] * 0.5
+
+            # Next state
+            env.current_step = step + 1
+            env.episode_history.append({
+                'video_idx': action_discrete,
+                'reward': reward
+            })
+            next_state = env._get_state()
+
+            # Done flag (last transition for this user)
+            done = float(step == len(video_seq) - 2)
+
+            all_obs.append(state)
+            all_acts.append(np.array([action_continuous], dtype=np.float32))
+            all_rews.append(reward)
+            all_next_obs.append(next_state)
+            all_dones.append(done)
+
+    print(f"\nDone! Created {len(all_obs)} offline transitions from {n_users} users")
+
+    # Convert to tensors
+    obs_tensor = torch.tensor(np.array(all_obs), dtype=torch.float32)
+    act_tensor = torch.tensor(np.array(all_acts), dtype=torch.float32)
+    rew_tensor = torch.tensor(np.array(all_rews), dtype=torch.float32)
+    next_obs_tensor = torch.tensor(np.array(all_next_obs), dtype=torch.float32)
+    done_tensor = torch.tensor(np.array(all_dones), dtype=torch.float32)
+
+    return Batch(
+        obs=obs_tensor,
+        act=act_tensor,
+        rew=rew_tensor,
+        next_obs=next_obs_tensor,
+        done=done_tensor
+    )

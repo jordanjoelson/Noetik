@@ -11,6 +11,10 @@ processed_data/
 # Outputs
 outputs/
 
+# Model checkpoints
+checkpoints/
+checkpoints_improved/
+
 # Claude Code
 .claude/
 
@@ -35,9 +39,3 @@ build/
 
 # macOS
 .DS_Store
-KuaiRand-1K/data
-src/iql/__pycache__
-__pycache__
-src/training/__pycache__
-venv/
-iql/__pycache__
