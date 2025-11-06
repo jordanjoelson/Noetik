@@ -39,7 +39,7 @@ interpret.py                     # Gradient-based interpretability
 
 ## Environment
 
-- **State**: 64-dimensional vector (user embedding + history + context)
+- **State**: 128-dimensional vector (user embedding + history + context)
 - **Action**: Discrete (video recommendations)
 - **Reward**: 0.5 * click + 0.5 * watch_ratio
 - **Episode**: 10 steps
