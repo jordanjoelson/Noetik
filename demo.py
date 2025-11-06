@@ -3,8 +3,8 @@ import sys
 import os
 import torch
 
-from data_loader import KuaiRandDataLoader
-from environment import KuaiRandEnv
+from src.data_loader import KuaiRandDataLoader
+from src.environment import KuaiRandEnv
 from agent import IQLAgent
 from src.iql.config import IQLConfig
 
