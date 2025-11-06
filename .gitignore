@@ -4,6 +4,7 @@ KuaiRand-1K/
 
 # Virtual environment
 kuairand_env/
+venv/
 
 # Processed data cache
 processed_data/

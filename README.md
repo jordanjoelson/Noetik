@@ -1,6 +1,6 @@
-# KuaiRand RL Environment
+# Noetik: Interpretable RL for Video Recommendations
 
-RL environment for video recommendation using the KuaiRand dataset with offline IQL training.
+RL environment for video recommendation using the KuaiRand dataset with offline IQL training and gradient-based interpretability.
 
 ## Quick Start
 
@@ -34,6 +34,7 @@ src/
 create_train_test_split.py      # Data splitting
 train_offline_improved.py       # Offline IQL trainer
 evaluate_improved_model.py      # Model evaluation
+interpret.py                     # Gradient-based interpretability
 ```
 
 ## Environment

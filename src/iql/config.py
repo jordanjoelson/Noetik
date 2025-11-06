@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class IQLConfig:
-    obs_dim: int = 64        
+    obs_dim: int = 128        
     act_dim: int = 1
     
     hidden_sizes: tuple = (256, 256)

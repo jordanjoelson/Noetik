@@ -21,7 +21,7 @@ def main():
     env = KuaiRandEnv(data_loader=loader, max_episode_length=10)
     
     agent_config = IQLConfig(
-        obs_dim=64,
+        obs_dim=128,
         act_dim=1, 
         hidden_sizes=(256, 256),
         discount=0.99,
