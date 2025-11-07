@@ -9,6 +9,7 @@ from src.iql.networks import ValueNet, QNet, GaussianTanhPolicy
 from src.iql.config import IQLConfig
 from src.data_loader import KuaiRandDataLoader
 from src.environment import KuaiRandEnv
+from src.iql.attention import MultiHeadAttention
 
 
 class AttentionAnalyzer:
@@ -23,6 +24,8 @@ class AttentionAnalyzer:
         self.output_dir = Path("outputs/attention_analysis")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
+        # Diagnostic info
+        print(f"[Diag] AttentionAnalyzer created: value_net={type(value_net).__name__}, q_net={type(q_net).__name__}, policy_net={type(policy_net).__name__}")
     def extract_attention_weights(self, obs: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Extract attention weights from all networks for analysis."""
         
@@ -37,9 +40,20 @@ class AttentionAnalyzer:
         # Register hooks
         hooks = []
         for net in [self.value_net, self.q_net, self.policy_net]:
+            print(f"[Diag] Inspecting modules in {type(net).__name__}")
             for name, module in net.named_modules():
-                if 'attention' in name.lower():
-                    hooks.append(module.register_forward_hook(hook_fn))
+                # Print module types for debugging
+                print(f"  module: {name} -> {type(module).__name__}")
+                # Register hook for MultiHeadAttention or any module exposing last_attn
+                try:
+                    if isinstance(module, MultiHeadAttention):
+                        print(f"Registering hook for {name} (MultiHeadAttention)")
+                        hooks.append(module.register_forward_hook(hook_fn))
+                    elif hasattr(module, 'last_attn'):
+                        print(f"Registering hook for {name} (has last_attn)")
+                        hooks.append(module.register_forward_hook(hook_fn))
+                except Exception as e:
+                    print(f"[Diag] Failed to register hook for {name}: {e}")
         
         # Forward pass
         with torch.no_grad():
@@ -54,38 +68,41 @@ class AttentionAnalyzer:
         return attention_weights
     
     def analyze_component_importance(self, obs: torch.Tensor) -> Dict[str, float]:
-        """Analyze which components (user, history, context) receive most attention."""
-        
         weights = self.extract_attention_weights(obs)
-        
-        # Average attention weights across heads and batches
-        component_scores = {
-            'user': 0.0,
-            'history': 0.0,
-            'context': 0.0
-        }
-        
+        component_scores = {'user': 0.0, 'history': 0.0, 'context': 0.0}
+
         for attn_name, attn_weights in weights.items():
-            # Average across batches and heads
+            # attn_weights shape: (B, heads, N, N)
+            # Compute mean across batch and heads
             avg_weights = attn_weights.mean(dim=(0,1))  # (N, N)
-            
-            # Sum attention to each component
             component_scores['user'] += avg_weights[:, 0].mean().item()
             component_scores['history'] += avg_weights[:, 1].mean().item()
             component_scores['context'] += avg_weights[:, 2].mean().item()
-            
-        # Normalize scores
+
         total = sum(component_scores.values())
+        if total == 0 or torch.isnan(torch.tensor(total)):
+            total = 1e-8
+
         for k in component_scores:
             component_scores[k] /= total
-            
+
+        # Diagnostic: print per-head L1 differences
+        for attn_name, attn_weights in weights.items():
+            diff = attn_weights[0].diff(dim=-1).abs().mean().item()
+            print(f"[Debug] {attn_name} mean head difference: {diff:.4f}")
+
         return component_scores
+
     
     def visualize_attention_patterns(self, obs: torch.Tensor, save_path: str = None):
         """Create heatmap visualizations of attention patterns."""
         
         weights = self.extract_attention_weights(obs)
         
+        if not weights:
+            print("⚠ Warning: No attention weights captured. Check network architecture.")
+            return
+            
         fig, axes = plt.subplots(1, len(weights), figsize=(15, 5))
         if len(weights) == 1:
             axes = [axes]
@@ -192,6 +209,11 @@ def main():
     state, _ = env.reset()
     state_tensor = torch.FloatTensor(state).unsqueeze(0)
     
+    # Diagnostic: verify analyzer has expected method
+    print(f"[Diag] analyzer type: {type(analyzer)}")
+    print(f"[Diag] has analyze_component_importance: {hasattr(analyzer, 'analyze_component_importance')}")
+    print(f"[Diag] available methods: {[m for m in dir(analyzer) if 'analyze' in m or 'extract' in m or 'visualize' in m]}")
+
     importance = analyzer.analyze_component_importance(state_tensor)
     print("\nComponent importance:")
     for component, score in importance.items():

@@ -156,7 +156,7 @@ class GaussianTanhPolicy(nn.Module):
                 context_dim=hidden[0],
                 head_dim=32,
                 num_heads=8,
-                dropout=0.1
+                dropout=0.15   #slight increase in dropout for policy for added variability between attention heads
             ) for _ in range(num_attention_blocks)
         ])
         
