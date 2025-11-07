@@ -163,7 +163,7 @@ def main():
     print("\n[3/5] Creating IQL Agent with improved config...")
 
     config = IQLConfig(
-        obs_dim=128,
+        obs_dim=64,
         act_dim=1,
         hidden_sizes=(256, 256),
         lr_policy=1e-4,

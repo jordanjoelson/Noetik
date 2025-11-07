@@ -3,7 +3,7 @@ import torch
 from typing import Dict, List
 import random
 
-from environment import KuaiRandEnv
+from src.environment import KuaiRandEnv
 from agent import IQLAgent
 from src.iql.config import IQLConfig
 from src.iql.batch import Batch 
@@ -38,9 +38,10 @@ class ReplayBuffer:
         return len(self.buffer)
 
 class IQLTrainer:
-    def __init__(self, env: KuaiRandEnv, agent_config: IQLConfig):
+    def __init__(self, env: KuaiRandEnv, agent_config: IQLConfig, device: str = "cuda" if torch.cuda.is_available() else "cpu"):
         self.env = env
-        self.agent = IQLAgent(agent_config)
+        self.device = device
+        self.agent = IQLAgent(agent_config, device=device)
         self.replay_buffer = ReplayBuffer(capacity=100000)
         
     def continuous_to_discrete(self, continuous_act: torch.Tensor, n_actions: int) -> int:
@@ -129,9 +130,9 @@ class IQLTrainer:
         actions = actions.reshape(-1, 1)
         
         return Batch(
-            obs=torch.FloatTensor(states),
-            act=torch.FloatTensor(actions), 
-            rew=torch.FloatTensor(rewards),
-            next_obs=torch.FloatTensor(next_states),
-            done=torch.FloatTensor(dones)
+            obs=torch.FloatTensor(states).to(self.device),
+            act=torch.FloatTensor(actions).to(self.device),
+            rew=torch.FloatTensor(rewards).to(self.device),
+            next_obs=torch.FloatTensor(next_states).to(self.device),
+            done=torch.FloatTensor(dones).to(self.device)
         )

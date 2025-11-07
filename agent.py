@@ -11,14 +11,17 @@ from src.iql.batch import Batch
 
 
 class IQLAgent(nn.Module):
-    def __init__(self, cfg: IQLConfig):
+    def __init__(self, cfg: IQLConfig, device: str = "cuda" if torch.cuda.is_available() else "cpu"):
         super().__init__()
         self.cfg = cfg
+        self.device = device
+        
+        # Initialize networks and move to device
         self.policy = GaussianTanhPolicy(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes,
-                                         cfg.policy_log_std_min, cfg.policy_log_std_max)
-        self.value = ValueNet(cfg.obs_dim, cfg.hidden_sizes)
-        self.q1 = QNet(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes)
-        self.q2 = QNet(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes)
+                                         cfg.policy_log_std_min, cfg.policy_log_std_max).to(device)
+        self.value = ValueNet(cfg.obs_dim, cfg.hidden_sizes).to(device)
+        self.q1 = QNet(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes).to(device)
+        self.q2 = QNet(cfg.obs_dim, cfg.act_dim, cfg.hidden_sizes).to(device)
 
         self.opt_policy = optim.Adam(self.policy.parameters(), lr=cfg.lr_policy, weight_decay=cfg.weight_decay)
         self.opt_q = optim.Adam(list(self.q1.parameters()) + list(self.q2.parameters()), lr=cfg.lr_q, weight_decay=cfg.weight_decay)
@@ -31,6 +34,7 @@ class IQLAgent(nn.Module):
         deterministic=True returns tanh(mu) (no sampling). Use deterministic=False
         if you want exploration-like behavior.
         """
+        obs = obs.to(self.device)
         a, _, _, _ = self.policy(obs, deterministic=deterministic)
         return a
 
@@ -39,6 +43,13 @@ class IQLAgent(nn.Module):
 
         Returns a dict of scalars you can print or log.
         """
+        # Move batch to device
+        batch.obs = batch.obs.to(self.device)
+        batch.act = batch.act.to(self.device)
+        batch.rew = batch.rew.to(self.device)
+        batch.next_obs = batch.next_obs.to(self.device)
+        batch.done = batch.done.to(self.device)
+        
         cfg = self.cfg
         loss_policy, loss_q, loss_v, logs = compute_iql_losses(
             obs=batch.obs,
