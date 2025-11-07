@@ -8,7 +8,7 @@ class KuaiRandEnv(gym.Env):
     """
     Gymnasium-compatible RL environment for video recommendation
 
-    State: 64-dimensional vector (user embedding + history + context)
+    State: 128-dimensional vector (user embedding + history + context)
     Action: Discrete (video index to recommend)
     Reward: Composite signal (click + watch_ratio + like)
     Episode: 10 steps
@@ -23,7 +23,7 @@ class KuaiRandEnv(gym.Env):
         # Define action and observation spaces
         self.action_space = gym.spaces.Discrete(data_loader.get_n_videos())
         self.observation_space = gym.spaces.Box(
-            low=-10.0, high=10.0, shape=(64,), dtype=np.float32
+            low=-10.0, high=10.0, shape=(128,), dtype=np.float32
         )
 
         # Episode state
@@ -100,56 +100,56 @@ class KuaiRandEnv(gym.Env):
 
     def _get_state(self) -> np.ndarray:
         """
-        Encode current state as 64-dimensional vector
+        Encode current state as 128-dimensional vector
 
         State components:
-        - [0:16]: User embedding
-        - [16:48]: History embedding
-        - [48:64]: Context features
+        - [0:32]: User embedding
+        - [32:96]: History embedding
+        - [96:128]: Context features
         """
-        state = np.zeros(64, dtype=np.float32)
+        state = np.zeros(128, dtype=np.float32)
 
-        # User embedding (simple hash-based encoding)
+        # User embedding
         user_emb = self._encode_user(self.current_user_idx)
-        state[0:16] = user_emb
+        state[0:32] = user_emb
 
         # History embedding
         history_emb = self._encode_history(self.current_user_idx)
-        state[16:48] = history_emb
+        state[32:96] = history_emb
 
         # Context features
         context_emb = self._encode_context()
-        state[48:64] = context_emb
+        state[96:128] = context_emb
 
         return state
 
     def _encode_user(self, user_idx: int) -> np.ndarray:
         """
-        Encode user as 16-dimensional vector
+        Encode user as 32-dimensional vector
 
         Uses user statistics from data loader
         """
-        user_emb = np.zeros(16, dtype=np.float32)
+        user_emb = np.zeros(32, dtype=np.float32)
 
         # Simple hash encoding
-        user_emb[user_idx % 16] = 1.0
+        user_emb[user_idx % 32] = 1.0
 
         # User statistics
         user_stats = self.data_loader.user_stats.get(user_idx, {})
         user_emb[0] = user_stats.get('click_rate', 0.0)
         user_emb[1] = user_stats.get('like_rate', 0.0)
         user_emb[2] = user_stats.get('avg_watch_ratio', 0.0)
-        user_emb[3] = min(1.0, user_stats.get('count', 0) / 1000.0)  # Normalized count
+        user_emb[3] = min(1.0, user_stats.get('count', 0) / 1000.0)
 
         return user_emb
 
     def _encode_history(self, user_idx: int) -> np.ndarray:
         """
-        Encode user history as 32-dimensional vector
+        Encode user history as 64-dimensional vector
 
         Includes both long-term history and episode history
         """
-        history_emb = np.zeros(32, dtype=np.float32)
+        history_emb = np.zeros(64, dtype=np.float32)
 
         # Get user's long-term history
         user_history = self.data_loader.get_user_history(user_idx)
@@ -183,9 +183,9 @@ class KuaiRandEnv(gym.Env):
 
     def _encode_context(self) -> np.ndarray:
         """
-        Encode episode context as 16-dimensional vector
+        Encode episode context as 32-dimensional vector
         """
-        context_emb = np.zeros(16, dtype=np.float32)
+        context_emb = np.zeros(32, dtype=np.float32)
 
         # Episode progress
         context_emb[0] = self.current_step / self.max_episode_length

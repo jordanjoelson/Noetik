@@ -14,7 +14,7 @@ def fanin_init(m: nn.Module):
         nn.init.uniform_(m.weight, -bound, bound)
         if m.bias is not None:
             nn.init.uniform_(m.bias, -bound, bound)
- 
+
 
 def build_mlp(in_dim: int, hidden: Iterable[int], out_dim: int, act=nn.ReLU) -> nn.Sequential:
     """Build MLP: [Linear -> Activation] * N then Linear -> out_dim."""
@@ -59,7 +59,7 @@ def preprocess_kuairand(data_loader, env, max_transitions_per_user: int = None):
         video_seq = history['video_sequence']
 
         if len(video_seq) < 2:
-            continue  # Need at least 2 interactions for (s, a, r, s')
+            continue
 
         # Limit transitions per user if specified
         max_len = len(video_seq) - 1

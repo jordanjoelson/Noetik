@@ -3,8 +3,8 @@ import sys
 import os
 import torch
 
-from data_loader import KuaiRandDataLoader
-from environment import KuaiRandEnv
+from src.data_loader import KuaiRandDataLoader
+from src.environment import KuaiRandEnv
 from agent import IQLAgent
 from src.iql.config import IQLConfig
 
@@ -31,8 +31,8 @@ print(f"Action space: {env.action_space.n:,} videos")
 
 print("\n[3/3] Creating IQL agent...")
 agent_config = IQLConfig(
-    obs_dim=64,
-    act_dim=1, 
+    obs_dim=128,
+    act_dim=1,
     hidden_sizes=(256, 256)
 )
 agent = IQLAgent(agent_config)
