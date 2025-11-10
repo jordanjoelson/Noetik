@@ -1,0 +1,15 @@
+2025-11-10 15:02:46,166 INFO    MainThread:20932 [wandb_setup.py:_flush():81] Current SDK version is 0.22.3
+2025-11-10 15:02:46,166 INFO    MainThread:20932 [wandb_setup.py:_flush():81] Configure stats pid to 20932
+2025-11-10 15:02:46,167 INFO    MainThread:20932 [wandb_setup.py:_flush():81] Loading settings from C:\Users\jjoel\.config\wandb\settings
+2025-11-10 15:02:46,167 INFO    MainThread:20932 [wandb_setup.py:_flush():81] Loading settings from C:\Users\jjoel\OneDrive\Projects\Noetik\wandb\settings
+2025-11-10 15:02:46,167 INFO    MainThread:20932 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2025-11-10 15:02:46,167 INFO    MainThread:20932 [wandb_init.py:setup_run_log_directory():706] Logging user logs to C:\Users\jjoel\OneDrive\Projects\Noetik\wandb\run-20251110_150246-wvpcojl0\logs\debug.log
+2025-11-10 15:02:46,168 INFO    MainThread:20932 [wandb_init.py:setup_run_log_directory():707] Logging internal logs to C:\Users\jjoel\OneDrive\Projects\Noetik\wandb\run-20251110_150246-wvpcojl0\logs\debug-internal.log
+2025-11-10 15:02:46,168 INFO    MainThread:20932 [wandb_init.py:init():833] calling init triggers
+2025-11-10 15:02:46,168 INFO    MainThread:20932 [wandb_init.py:init():838] wandb.init called with sweep_config: {}
+config: {'_wandb': {}}
+2025-11-10 15:02:46,168 INFO    MainThread:20932 [wandb_init.py:init():881] starting backend
+2025-11-10 15:02:49,112 INFO    MainThread:20932 [wandb_init.py:init():884] sending inform_init request
+2025-11-10 15:02:49,194 INFO    MainThread:20932 [wandb_init.py:init():892] backend started and connected
+2025-11-10 15:02:49,195 INFO    MainThread:20932 [wandb_init.py:init():962] updated telemetry
+2025-11-10 15:02:49,273 INFO    MainThread:20932 [wandb_init.py:init():986] communicating run to backend with 90.0 second timeout

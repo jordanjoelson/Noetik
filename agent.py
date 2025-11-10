@@ -69,19 +69,56 @@ class IQLAgent(nn.Module):
         # Step Q
         self.opt_q.zero_grad(set_to_none=True)
         loss_q.backward()
+        # compute grad norm for q before clipping
+        q_grad_norm = 0.0
+        for p in list(self.q1.parameters()) + list(self.q2.parameters()):
+            if p.grad is not None:
+                q_grad_norm += p.grad.data.norm(2).item() ** 2
+        q_grad_norm = q_grad_norm ** 0.5
         torch.nn.utils.clip_grad_norm_(list(self.q1.parameters()) + list(self.q2.parameters()), 10.0)
+        q_lr = self.opt_q.param_groups[0]['lr'] if len(self.opt_q.param_groups) > 0 else None
         self.opt_q.step()
 
         # Step V
         self.opt_v.zero_grad(set_to_none=True)
         loss_v.backward()
+        v_grad_norm = 0.0
+        for p in self.value.parameters():
+            if p.grad is not None:
+                v_grad_norm += p.grad.data.norm(2).item() ** 2
+        v_grad_norm = v_grad_norm ** 0.5
         torch.nn.utils.clip_grad_norm_(self.value.parameters(), 10.0)
+        v_lr = self.opt_v.param_groups[0]['lr'] if len(self.opt_v.param_groups) > 0 else None
         self.opt_v.step()
 
         # Step policy
         self.opt_policy.zero_grad(set_to_none=True)
         loss_policy.backward()
+        policy_grad_norm = 0.0
+        for p in self.policy.parameters():
+            if p.grad is not None:
+                policy_grad_norm += p.grad.data.norm(2).item() ** 2
+        policy_grad_norm = policy_grad_norm ** 0.5
         torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 10.0)
+        policy_lr = self.opt_policy.param_groups[0]['lr'] if len(self.opt_policy.param_groups) > 0 else None
         self.opt_policy.step()
+
+        # Try to log per-update diagnostics to Weights & Biases if available
+        try:
+            import wandb
+            wandb.log({
+                'loss_q': loss_q.item(),
+                'loss_v': loss_v.item(),
+                'loss_policy': loss_policy.item(),
+                'grad_norm_q': q_grad_norm,
+                'grad_norm_v': v_grad_norm,
+                'grad_norm_policy': policy_grad_norm,
+                'lr_q': q_lr,
+                'lr_v': v_lr,
+                'lr_policy': policy_lr,
+            })
+        except Exception:
+            # wandb not installed or logging not desired — ignore
+            pass
 
         return logs
