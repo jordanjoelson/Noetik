@@ -36,7 +36,7 @@ class KuaiRandEnv(gym.Env):
         Reset environment and start new episode
 
         Returns:
-            state: 64-dimensional state vector
+            state: 128-dimensional state vector
             info: Additional information
         """
         super().reset(seed=seed)
@@ -285,7 +285,7 @@ if __name__ == "__main__":
 
     # Test 1: Reset
     state, info = env.reset()
-    assert state.shape == (64,), f"State shape should be (64,), got {state.shape}"
+    assert state.shape == (128,), f"State shape should be (128,), got {state.shape}"
     print(f"Reset works, state shape: {state.shape}")
 
     # Test 2: Action space
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     # Test 3: Step
     action = env.action_space.sample()
     next_state, reward, terminated, truncated, info = env.step(action)
-    assert next_state.shape == (64,), "Next state shape incorrect"
+    assert next_state.shape == (128,), "Next state shape incorrect"
     assert 0 <= reward <= 1.0, f"Reward should be in [0, 1], got {reward}"
     print(f"Step works, reward: {reward:.3f}")
 
