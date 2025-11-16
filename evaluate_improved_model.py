@@ -13,6 +13,7 @@ import argparse
 
 from src.iql.config import IQLConfig
 from agent import IQLAgent
+from interpret import GradientDescentInterpreter
 
 
 def evaluate_improved_model(
@@ -183,6 +184,72 @@ def evaluate_improved_model(
     improvement = ((top_reward / bottom_reward) - 1) * 100
     print(f"\n  Ranking improvement: {improvement:.1f}%")
 
+    
+    print("\nINTERPRETATION ANALYSIS")
+
+    interpreter = GradientDescentInterpreter(agent)
+
+    print(f"\nAnalyzing top {min(10, len(sorted_indices))} recommendations:")
+    for i, idx in enumerate(sorted_indices[:10]):
+        user_idx, video_idx = test_samples[idx][0]
+        interaction = test_samples[idx][1]
+        
+        state = np.zeros(128, dtype=np.float32)
+        state[user_idx % 16] = 1.0
+        action_continuous = (video_idx / (n_videos - 1)) * 2.0 - 1.0
+        
+        importance = interpreter.compute_importance(state, action_continuous)
+        explanation = interpreter.generate_gradient_explanation(state, action_continuous)
+        confidence = interpreter.analyze_decision_confidence(state, action_continuous)
+        
+        print(f"\nTop #{i+1}: User {user_idx}, Video {video_idx}")
+        print(f"  Q-value: {q_values[idx]:.4f}, GT Reward: {gt_rewards[idx]:.4f}")
+        print(f"  Click: {interaction['is_click']}, Watch: {interaction['watch_ratio']:.2f}")
+        print(f"  Explanation: {explanation}")
+        print(f"  Confidence: {'HIGH' if confidence['is_high_confidence'] else 'MEDIUM' if not confidence['is_ambiguous'] else 'LOW'}")
+        print(f"  Top features: {interpreter.get_top_influential_features(state, action_continuous, top_k=2)}")
+
+    print("OVERALL FEATURE IMPORTANCE DISTRIBUTION")
+
+    sample_interpretations = []
+    for idx in sorted_indices[:100]:  #top 100 sampled
+        user_idx, video_idx = test_samples[idx][0]
+        state = np.zeros(64, dtype=np.float32)
+        state[user_idx % 16] = 1.0
+        action_continuous = (video_idx / (n_videos - 1)) * 2.0 - 1.0
+        
+        importance = interpreter.compute_importance(state, action_continuous)
+        sample_interpretations.append(importance)
+
+    avg_importance = {key: np.mean([imp[key] for imp in sample_interpretations]) 
+                     for key in sample_interpretations[0].keys()}
+
+    print("Average feature importance in top recommendations:")
+    for feature, importance in sorted(avg_importance.items(), key=lambda x: x[1], reverse=True):
+        print(f"  {feature}: {importance:.3f}")
+
+    print("COMPARISON: TOP vs BOTTOM RECOMMENDATIONS")
+
+    bottom_interpretations = []
+    for idx in sorted_indices[-100:]:  #bottom 100 sampled
+        user_idx, video_idx = test_samples[idx][0]
+        state = np.zeros(64, dtype=np.float32)
+        state[user_idx % 16] = 1.0
+        action_continuous = (video_idx / (n_videos - 1)) * 2.0 - 1.0
+        
+        importance = interpreter.compute_importance(state, action_continuous)
+        bottom_interpretations.append(importance)
+
+    avg_importance_bottom = {key: np.mean([imp[key] for imp in bottom_interpretations]) 
+                           for key in bottom_interpretations[0].keys()}
+
+    print("Feature importance differences (Top - Bottom):")
+    for feature in avg_importance.keys():
+        diff = avg_importance[feature] - avg_importance_bottom[feature]
+        print(f"  {feature:20}: {diff:+.3f}")
+
+    print("\n" + "="*70)
+
     # Interpretation
     print("\n" + "="*70)
     print("INTERPRETATION")
@@ -221,8 +288,6 @@ def evaluate_improved_model(
     for s in status:
         print(f"\n{s}")
 
-    print("\n" + "="*70)
-
     return {
         'correlations': {
             'q_reward': q_reward_corr,
@@ -234,8 +299,15 @@ def evaluate_improved_model(
             'reward': top_reward,
             'click': gt_clicks[sorted_indices[:top_k]].mean(),
             'watch': gt_watch[sorted_indices[:top_k]].mean()
+        },
+        'interpretation': {
+            'avg_feature_importance': avg_importance,
+            'feature_importance_diff': {feature: avg_importance[feature] - avg_importance_bottom[feature] 
+                                      for feature in avg_importance.keys()}
         }
     }
+
+        
 
 
 if __name__ == "__main__":
