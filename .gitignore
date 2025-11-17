@@ -8,6 +8,7 @@ venv/
 
 # Processed data cache
 processed_data/
+processed_data_medium/
 
 # Outputs
 outputs/
@@ -15,6 +16,9 @@ outputs/
 # Model checkpoints
 checkpoints/
 checkpoints_improved/
+checkpoints_medium/
+checkpoints_quick_test/
+checkpoints_small_optimized/
 
 # Claude Code
 .claude/

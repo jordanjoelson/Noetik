@@ -114,7 +114,7 @@ def create_train_test_split(
             'watch_ratio_mean': watch_ratios.mean(),
             'watch_ratio_std': watch_ratios.std(),
             'like_rate': likes.mean(),
-            'reward_mean': 0.3 * clicks.mean() + 0.4 * watch_ratios.mean() + 0.3 * likes.mean()
+            'reward_mean': 0.5 * clicks.mean() + 0.5 * watch_ratios.mean()
         }
 
     train_stats = compute_stats(train_interactions)

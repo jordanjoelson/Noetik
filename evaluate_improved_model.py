@@ -89,9 +89,12 @@ def evaluate_improved_model(
         test_samples = test_samples[:5000]
 
     for (user_idx, video_idx), interaction in tqdm(test_samples, desc="Evaluating"):
-        # Simple state
-        state = np.zeros(64, dtype=np.float32)
-        state[user_idx % 16] = 1.0
+        # Create 128-dim state (matches environment output)
+        state = np.zeros(128, dtype=np.float32)
+        # Simple encoding for evaluation
+        state[user_idx % 32] = 1.0  # User portion (0-31)
+        state[32 + (video_idx % 64)] = 0.5  # History portion (32-95)
+        state[96 + (user_idx % 32)] = 0.25  # Context portion (96-127)
 
         state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
 
@@ -112,11 +115,10 @@ def evaluate_improved_model(
         # Denormalize Q-values to original scale
         q_denormalized = q_normalized * reward_std + reward_mean
 
-        # Ground truth (unnormalized)
+        # Ground truth (unnormalized) - use current 50/50 formula
         gt_reward = (
-            0.3 * interaction['is_click'] +
-            0.4 * interaction['watch_ratio'] +
-            0.3 * interaction['is_like']
+            0.5 * interaction['is_click'] +
+            0.5 * interaction['watch_ratio']
         )
 
         results['q_values'].append(q_normalized)
