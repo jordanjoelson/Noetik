@@ -22,13 +22,7 @@
 - Trainer: Uses a multi-objective optimization that balances engagement modeling with interpretability and transparency.
 
 ## Architecture
-- Enviroment
-- Agent
-  - Policy
-    - Attention Mechanism
-  - Interpretability Layer
-- Trainer
-  - Action chosen in the policy
+ <img width="815" height="378" alt="Model Architecture" src=assets/noetik-architecture.JPG/>
  
 # Novelty
 - Treats social media interaction as a reinforcement learning process, simulating how users learn and adapt through feedback.
