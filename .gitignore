@@ -1,0 +1,48 @@
+# Dataset
+KuaiRand-1k/
+KuaiRand-1K/
+
+# Virtual environment
+kuairand_env/
+venv/
+
+# Processed data cache
+processed_data/
+processed_data_medium/
+
+# Outputs
+outputs/
+
+# Model checkpoints
+checkpoints/
+checkpoints_improved/
+checkpoints_medium/
+checkpoints_quick_test/
+checkpoints_small_optimized/
+
+# Claude Code
+.claude/
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# macOS
+.DS_Store
+
+venv1
